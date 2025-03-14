@@ -3,8 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using HarmonyLib;
 using Newtonsoft.Json;
 using REPOSE.Logger;
+using REPOSE.Mods.Events;
+using UnityEngine.SceneManagement;
 
 namespace REPOSE.Mods
 {
@@ -13,6 +16,9 @@ namespace REPOSE.Mods
     /// </summary>
     public static class ModAggregator
     {
+        static readonly Harmony harmonyInstance = new Harmony("com.REPOSE.Mods.dll");
+        private static bool harmony_initialized = false;
+
         const string MOD_JSON_IDENTIFIER = ".mod";
 
         /// <summary>
@@ -34,17 +40,43 @@ namespace REPOSE.Mods
         public static IReadOnlyList<Mod>? LoadedMods { get; private set; }
         public static int LoadAndStartMods()
         {
-            if (StopModsFromLoading) return 0;
+            if (StopModsFromLoading) return -1;
+
+            if (!harmony_initialized) //initialize patching methods for harmony.
+            {
+                harmonyInstance.PatchAll(Assembly.GetExecutingAssembly());
+                harmony_initialized = true;
+            }
 
             LoadedMods ??= LoadMods();
+            InitializeMods(); //we need to do this for main menu support
+
+            SceneManager.sceneLoaded += (Scene scene, LoadSceneMode mode) =>
+            {
+                UninitializeMods();
+                InitializeMods();
+            };
+
+
+            StopModsFromLoading = true;
+            return LoadedMods.Count;
+        }
+
+        // <summary>
+        /// Initialize all loaded mods, is false if mods have not been loaded...
+        /// </summary>
+        /// <returns>True if LoadedMods was initialized. <see cref="LoadAndStartMods"/></returns>
+        public static bool InitializeMods()
+        {
+            if (LoadedMods == null)
+                return false;
 
             foreach (Mod mod in LoadedMods)
             {
                 mod.Initialize();
             }
 
-            StopModsFromLoading = true;
-            return LoadedMods.Count;
+            return true;
         }
 
         /// <summary>
@@ -61,7 +93,6 @@ namespace REPOSE.Mods
                 mod.UnInitialize();
             }
 
-            StopModsFromLoading = false;
             return true;
         }
 

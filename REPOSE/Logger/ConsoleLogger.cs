@@ -4,8 +4,6 @@ using System.Runtime.InteropServices;
 
 namespace REPOSE.Logger
 {
-
-
     public sealed class ConsoleLogger : ILog, IDisposable
     {
         [DllImport("kernel32.dll")]
