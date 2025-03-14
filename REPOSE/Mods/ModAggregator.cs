@@ -14,7 +14,7 @@ namespace REPOSE.Mods
     public static class ModAggregator
     {
         const string MOD_JSON_IDENTIFIER = ".mod";
-        
+
         /// <summary>
         /// The mods folder path Current Directory/Mods
         /// </summary>
@@ -25,18 +25,25 @@ namespace REPOSE.Mods
         /// </summary>
         public static string[] ModFolders => Directory.GetDirectories(ModsFolderPath);
 
-        public static IReadOnlyList<Mod> LoadedMods { get; private set; }
+
+        /// <summary>
+        /// Set this if you would like to stop mods from initializing. This is set to true after calling <see cref="LoadAndStartMods"/> and false after <seealso cref="UninitializeMods"/>
+        /// </summary>
+        public static bool StopModsFromLoading { get; set; } = false;
+
+        public static IReadOnlyList<Mod>? LoadedMods { get; private set; }
         public static int LoadAndStartMods()
         {
+            if (StopModsFromLoading) return 0;
+
             LoadedMods ??= LoadMods();
 
-            obj
-
-            foreach(Mod mod in LoadedMods)
+            foreach (Mod mod in LoadedMods)
             {
                 mod.Initialize();
             }
 
+            StopModsFromLoading = true;
             return LoadedMods.Count;
         }
 
@@ -46,14 +53,15 @@ namespace REPOSE.Mods
         /// <returns>True if LoadedMods was initialized. <see cref="LoadAndStartMods"/></returns>
         public static bool UninitializeMods()
         {
-            if(LoadedMods == null)
+            if (LoadedMods == null)
                 return false;
 
-            foreach(Mod mod in LoadedMods)
+            foreach (Mod mod in LoadedMods)
             {
                 mod.UnInitialize();
             }
 
+            StopModsFromLoading = false;
             return true;
         }
 
@@ -64,12 +72,12 @@ namespace REPOSE.Mods
         {
             List<Mod> mods = new List<Mod>();
 
-            List<(string modInfoPath, string modDLLPath)> aggreatedModItems = Aggregate();
+            List<(string modInfoPath, Assembly modDLL)> aggreatedModItems = Aggregate();
 
             foreach (var modItem in aggreatedModItems)
             {
-                if(string.IsNullOrEmpty(modItem.modInfoPath) || !File.Exists(modItem.modInfoPath)
-                    || string.IsNullOrEmpty(modItem.modDLLPath) || !File.Exists(modItem.modDLLPath))
+                if (string.IsNullOrEmpty(modItem.modInfoPath) || !File.Exists(modItem.modInfoPath) ||
+                    modItem.modDLL == null)
                 {
                     Debug.LogError($"There was an error reading a path to following mod: {modItem}");
                     continue;
@@ -84,11 +92,11 @@ namespace REPOSE.Mods
                     //See here: https://stackoverflow.com/questions/1477843/difference-between-loadfile-and-loadfrom-with-net-assemblies
                     //Main reason for us is because if the mod dll relies on other DLLs, it does not import them.
                     //So dependencies for the mod get loaded.
-                    Assembly loadedModAssem = Assembly.LoadFrom(modItem.modDLLPath);
+                    //Assembly loadedModAssem = Assembly.LoadFrom(modItem.modDLLPath);
 
-                    Type modType = loadedModAssem.GetTypes().FirstOrDefault(type => type.IsSubclassOf(typeof(Mod)));
+                    Type modType = modItem.modDLL.GetTypes().FirstOrDefault(type => type.IsSubclassOf(typeof(Mod)));
 
-                    if(modType == null)
+                    if (modType == null)
                     {
                         Debug.LogError($"The chosen assembly, did not contain a type with subclass of {nameof(Mod)}");
                         continue;
@@ -96,18 +104,18 @@ namespace REPOSE.Mods
 
                     ConstructorInfo ctor = modType.GetConstructor(new Type[0]);
 
-                    if(ctor == null)
+                    if (ctor == null)
                     {
                         Debug.LogError($"{modType.FullName} does not have an empty constructor. Please make an empty constructor.");
                         continue;
                     }
 
                     //finally a mod !yippee
-                    Mod mod = (Mod) ctor.Invoke(new object[0]);
-
+                    Mod mod = (Mod)ctor.Invoke(new object[0]);
+                    mod.info = desModInfo;
                     mods.Add(mod);
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     Debug.LogError($"Could not load mod: '{modItem}'\r\n\tReason: {ex}");
                     continue;
@@ -121,9 +129,9 @@ namespace REPOSE.Mods
         /// Loads all valid directories (Mods) 
         /// </summary>
         /// <returns></returns>
-        public static List<(string modPath, string dllPath)> Aggregate()
+        public static List<(string modPath, Assembly loadedDLL)> Aggregate()
         {
-            List<(string modPath, string dllPath)> aggregation = new List<(string, string)> ();
+            List<(string modPath, Assembly loadedDLL)> aggregation = new List<(string, Assembly)>();
 
             foreach (string dir in ModFolders)
             {
@@ -135,9 +143,9 @@ namespace REPOSE.Mods
                 //Retrieve releavant mod files, .mod and .dlls
                 string modInfoPath = filePaths.FirstOrDefault(x => Path.GetExtension(x).Equals(".mod", StringComparison.OrdinalIgnoreCase));
                 IEnumerable<string> dllPaths = filePaths.Where(pth => Path.GetExtension(pth).Equals(".dll", StringComparison.OrdinalIgnoreCase));
-                
+
                 //Check for any errors inside of this folder. If so, skip over, we do not wanna ruin the rest of the mods.
-                if(string.IsNullOrEmpty(modInfoPath))
+                if (string.IsNullOrEmpty(modInfoPath))
                 {
                     Debug.LogWarning($"Could not load directory '{dir}' because there was no *.mod file.");
                     continue;
@@ -148,29 +156,34 @@ namespace REPOSE.Mods
                     continue;
                 }
 
-                string? modAssemblyPath = null;
-                foreach(string dllPath in dllPaths)
+                Assembly? modAssembly = null;
+                foreach (string dllPath in dllPaths)
                 {
                     if (!File.Exists(dllPath))
                         continue;
 
                     //get file data
-                    byte[] dllBytes = File.ReadAllBytes(dllPath);
+                    //byte[] dllBytes = File.ReadAllBytes(dllPath);
 
                     //does not load the this into the currrent domain, meaning that we are just reading this file and not deps
-                    Assembly currentAssembly = Assembly.ReflectionOnlyLoad(dllBytes);
+
+                    //We want to use loadfrom, not load file.
+                    //See here: https://stackoverflow.com/questions/1477843/difference-between-loadfile-and-loadfrom-with-net-assemblies
+                    //Main reason for us is because if the mod dll relies on other DLLs, it does not import them.
+                    //So dependencies for the mod get loaded.
+                    Assembly currentAssembly = Assembly.LoadFrom(dllPath);
 
                     //Get any type matching
                     Type currentAssemblyMod = currentAssembly.GetTypes().FirstOrDefault(type => type.IsSubclassOf(typeof(Mod)));
 
                     if (currentAssemblyMod != null)
                     {
-                        modAssemblyPath = dllPath;
+                        modAssembly = currentAssembly;
                         break;
                     }
                 }
 
-                if (modAssemblyPath == null)
+                if (modAssembly == null)
                 {
                     Debug.LogWarning($"Could not load directory '{dir}' because there was no valid .dll types with a Mod inheritance.");
                     continue;
@@ -178,7 +191,7 @@ namespace REPOSE.Mods
 
                 //We have thus confirmed that there is a "valid" .mod folder and a valid Assembly path
                 //We are not sure if the Mod Info Path is valid, mainly because we did not read it, but we know it exist.
-                aggregation.Add((modInfoPath, modAssemblyPath));
+                aggregation.Add((modInfoPath, modAssembly));
             }
 
             //Return the list of successful items

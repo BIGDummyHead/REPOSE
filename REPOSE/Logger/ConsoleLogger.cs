@@ -1,12 +1,19 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace REPOSE.Logger
 {
 
 
-    public sealed class ConsoleLogger : ILog
+    public sealed class ConsoleLogger : ILog, IDisposable
     {
+        [DllImport("kernel32.dll")]
+        private static extern bool AllocConsole();
+
+        [DllImport("kernel32.dll")]
+        private static extern bool FreeConsole();
+
         public static string FormattedTime => DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
 
         public Stream WritingStream { get; set; }
@@ -14,6 +21,8 @@ namespace REPOSE.Logger
 
         public ConsoleLogger()
         {
+            AllocConsole();
+
             WritingStream = Console.OpenStandardOutput();
             ReadingStream = Console.OpenStandardInput();
         }
@@ -51,6 +60,11 @@ namespace REPOSE.Logger
             System.Console.Write($"[INFO - {FormattedTime}] ");
             ChangeColor(ConsoleColor.White);
             System.Console.WriteLine(message);
+        }
+
+        public void Dispose()
+        {
+            FreeConsole();
         }
     }
 
