@@ -15,6 +15,12 @@ namespace REPOSE.Mods
         public string Name { get; set; }
 
         /// <summary>
+        /// Name of the creator of the mod.
+        /// </summary>
+        [JsonProperty]
+        public string Author { get; set; }
+
+        /// <summary>
         /// Description of your mod, loaded from a JSON file.
         /// </summary>
         [JsonProperty]

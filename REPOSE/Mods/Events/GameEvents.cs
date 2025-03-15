@@ -21,7 +21,7 @@ namespace REPOSE.Mods.Events
         public static event Delegates.OnEnemySpawnAfter? AfterEnemySpawn;
 
 
-
+        
 
         [HarmonyPatch(typeof(RunManager), nameof(RunManager.ChangeLevel))]
         [HarmonyPrefix]
@@ -96,6 +96,24 @@ namespace REPOSE.Mods.Events
             AfterTTSSpeakNow?.Invoke(__instance, ref text, ref crouch);
         }
 
+        public static event Delegates.OnPlayerSpawn? BeforePlayerSpawn;
+        public static event Delegates.OnPlayerSpawn? AfterPlayerSpawn;
+
+        const string PLAYER_SPAWN_METHOD_NAME = "Awake";
+
+        [HarmonyPatch(typeof(PlayerAvatar), PLAYER_SPAWN_METHOD_NAME)]
+        [HarmonyPrefix]
+        private static bool Prefix_PlayerSpawn(PlayerAvatar __instance)
+        {
+            return BeforePlayerSpawn == null || BeforePlayerSpawn.Invoke(__instance);
+        }
+
+        [HarmonyPatch(typeof(PlayerAvatar), PLAYER_SPAWN_METHOD_NAME)]
+        [HarmonyPostfix]
+        private static void Postfix_PlayerSpawn(PlayerAvatar __instance)
+        {
+            AfterPlayerSpawn?.Invoke(__instance);
+        }
 
     }
 }

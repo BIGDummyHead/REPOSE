@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 
 namespace REPOSE.Logger
 {
-    public sealed class ConsoleLogger : ILog, IDisposable
+    public sealed class ConsoleLogger : ILog
     {
         [DllImport("kernel32.dll")]
         private static extern bool AllocConsole();
@@ -17,12 +17,18 @@ namespace REPOSE.Logger
         public Stream WritingStream { get; set; }
         public Stream ReadingStream { get; set; }
 
+        public StreamWriter StandardOutput { get; set; }
+
         public ConsoleLogger()
         {
             AllocConsole();
+            
+            StandardOutput = new StreamWriter(Console.OpenStandardOutput()) { AutoFlush = true };
+            WritingStream = StandardOutput.BaseStream;
+            Console.SetOut(StandardOutput);
+            Console.SetError(StandardOutput);
+            ReadingStream = StandardOutput.BaseStream;
 
-            WritingStream = Console.OpenStandardOutput();
-            ReadingStream = Console.OpenStandardInput();
         }
 
         public void ChangeColor(ConsoleColor color)

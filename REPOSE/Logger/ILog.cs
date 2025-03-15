@@ -6,7 +6,7 @@ namespace REPOSE.Logger
     /// <summary>
     /// Interface for logging.
     /// </summary>
-    public interface ILog
+    public interface ILog : IDisposable
     {
 
         /// <summary>

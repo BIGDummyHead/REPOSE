@@ -10,6 +10,7 @@ namespace REPOSE.Mods
     public abstract class Delegates
     {
         public delegate bool OnChangeLevel(bool _completedLevel, bool _levelFailed, RunManager.ChangeLevelType _changeLevelType);
+        public delegate bool OnPlayerSpawn(PlayerAvatar player); 
         public delegate bool OnPlayerDealth(PlayerAvatar player, int enemyIndex);
         public delegate bool OnPlayerRevive(PlayerAvatar player, bool byTruck);
         public delegate bool OnEnemySpawn(Enemy enemy);

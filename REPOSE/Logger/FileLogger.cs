@@ -3,7 +3,7 @@ using System.IO;
 
 namespace REPOSE.Logger
 {
-    public sealed class FileLogger : ILog, IDisposable
+    public sealed class FileLogger : ILog
     {
         public static string FormattedTime => DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
 

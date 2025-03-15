@@ -16,8 +16,8 @@ namespace REPOSE.Mods
     /// </summary>
     public static class ModAggregator
     {
-        static readonly Harmony harmonyInstance = new Harmony("com.REPOSE.Mods.dll");
-        private static bool harmony_initialized = false;
+        const string HARMONY_ID = "com.REPOSE.Mods.dll";
+        static readonly Harmony harmonyInstance = new Harmony(HARMONY_ID);
 
         const string MOD_JSON_IDENTIFIER = ".mod";
 
@@ -32,21 +32,12 @@ namespace REPOSE.Mods
         public static string[] ModFolders => Directory.GetDirectories(ModsFolderPath);
 
 
-        /// <summary>
-        /// Set this if you would like to stop mods from initializing. This is set to true after calling <see cref="LoadAndStartMods"/> and false after <seealso cref="UninitializeMods"/>
-        /// </summary>
-        public static bool StopModsFromLoading { get; set; } = false;
-
+        
         public static IReadOnlyList<Mod>? LoadedMods { get; private set; }
-        public static int LoadAndStartMods()
+        private static int LoadAndStartMods()
         {
-            if (StopModsFromLoading) return -1;
-
-            if (!harmony_initialized) //initialize patching methods for harmony.
-            {
+            if (!Harmony.HasAnyPatches(HARMONY_ID)) //initialize patching methods for harmony.
                 harmonyInstance.PatchAll(Assembly.GetExecutingAssembly());
-                harmony_initialized = true;
-            }
 
             LoadedMods ??= LoadMods();
             InitializeMods(); //we need to do this for main menu support
@@ -57,8 +48,14 @@ namespace REPOSE.Mods
                 InitializeMods();
             };
 
+            Debug.LogInfo("Successfully loaded mods!");
+            Debug._defLogger.Dispose();
 
-            StopModsFromLoading = true;
+            //start a new console logger, allocates
+            Debug._defLogger = new ConsoleLogger();
+
+            Debug.LogInfo("Success Loaded Mods!\r\nThank you for downloading REPOSE. https://github.com/BIGDummyHead/REPOSE");
+
             return LoadedMods.Count;
         }
 
