@@ -38,5 +38,10 @@ namespace REPOSE.Mods
 
         [JsonIgnore]
         private Version? _convVersion;
+
+        public override string ToString()
+        {
+            return $"{Name} created by {Author}\r\n{Description}\r\nVersion: {Version}";
+        }
     }
 }

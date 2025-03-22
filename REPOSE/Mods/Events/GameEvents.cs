@@ -12,7 +12,7 @@ namespace REPOSE.Mods.Events
         public static event Delegates.OnChangeLevel? AfterLevelChanged;
 
         public static event Delegates.OnPlayerDealth? BeforePlayerDeath;
-        public static event Delegates.OnPlayerDealth? AfterPlayerDeath; 
+        public static event Delegates.OnPlayerDealth? AfterPlayerDeath;
 
         public static event Delegates.OnPlayerRevive? BeforePlayerRevive;
         public static event Delegates.OnPlayerRevive? AfterPlayerRevive;
@@ -21,7 +21,7 @@ namespace REPOSE.Mods.Events
         public static event Delegates.OnEnemySpawnAfter? AfterEnemySpawn;
 
 
-        
+
 
         [HarmonyPatch(typeof(RunManager), nameof(RunManager.ChangeLevel))]
         [HarmonyPrefix]
@@ -62,7 +62,7 @@ namespace REPOSE.Mods.Events
         [HarmonyPostfix]
         private static void Postfix_PlayerRevive(PlayerAvatar __instance, bool _revivedByTruck)
         {
-           AfterPlayerRevive?.Invoke(__instance, _revivedByTruck);
+            AfterPlayerRevive?.Invoke(__instance, _revivedByTruck);
         }
 
         [HarmonyPatch(typeof(SemiFunc), nameof(SemiFunc.EnemySpawn))]

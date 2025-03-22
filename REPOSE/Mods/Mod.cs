@@ -11,7 +11,7 @@ namespace REPOSE.Mods
     {
         public Mod() { }
 
-        public Info info;
+        public Info? info;
 
         /// <summary>
         /// Converts the given file into a T type, JSON -> T
@@ -40,6 +40,14 @@ namespace REPOSE.Mods
         /// Undo everything <see cref="Initialize"/> did.
         /// </summary>
         public abstract void UnInitialize();
+
+        public override string ToString()
+        {
+            if (info == null)
+                return "No mod information";
+
+            return info.ToString();
+        }
     }
 
 }

@@ -38,7 +38,6 @@ namespace REPOSE.Logger
 
         public void Log(object message)
         {
-            ChangeColor(ConsoleColor.White);
             System.Console.WriteLine(message);
         }
 
