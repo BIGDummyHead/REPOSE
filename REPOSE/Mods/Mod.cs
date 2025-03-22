@@ -23,7 +23,7 @@ namespace REPOSE.Mods
         {
             if(!File.Exists(path))
             {
-                Debug.LogWarning($"Loading settings failed, '{path}' does not exist.");
+                RepoDebugger.LogWarning($"Loading settings failed, '{path}' does not exist.");
                 return default;
             }
             string text = File.ReadAllText(path);

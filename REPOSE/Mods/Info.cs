@@ -39,9 +39,17 @@ namespace REPOSE.Mods
         [JsonIgnore]
         private Version? _convVersion;
 
+        [JsonProperty("debug_path")]
+        public string DebugPath { get; set; }
+
         public override string ToString()
         {
-            return $"{Name} created by {Author}\r\n{Description}\r\nVersion: {Version}";
+            string top = $"{Name} created by {Author}\r\n{Description}\r\nVersion: {Version}";
+
+            if (!string.IsNullOrEmpty(DebugPath))
+                return top + $"\r\nDebug at: {DebugPath}";
+
+            return top;
         }
     }
 }

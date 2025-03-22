@@ -42,7 +42,7 @@ namespace REPOSE.Mods
         {
             if(typeof(T).GetMethod(methodName, ALL)?.GetCustomAttribute<PunRPC>() == null)
             {
-                Logger.Debug.LogWarning($"Failed to get the appropriate method for running RPC: {methodName} on type {typeof(T).FullName}");
+                Logger.RepoDebugger.LogWarning($"Failed to get the appropriate method for running RPC: {methodName} on type {typeof(T).FullName}");
                 return;
             }
 
@@ -53,7 +53,7 @@ namespace REPOSE.Mods
 
                 if (reflectedPView == null)
                 {
-                    Logger.Debug.LogWarning($"Failed to get a photonView for type: {typeof(T).FullName}, please provide one.");
+                    Logger.RepoDebugger.LogWarning($"Failed to get a photonView for type: {typeof(T).FullName}, please provide one.");
                     return;
                 }
 
@@ -87,6 +87,22 @@ namespace REPOSE.Mods
         public static void ChangeDeveloperMode(bool state)
         {
             SteamManager.instance.SetField("developerMode", state);
+        }
+
+        /// <summary>
+        /// Gets a random item from a collection of items.
+        /// </summary>
+        /// <typeparam name="T">Items from a collection type</typeparam>
+        /// <param name="items">All items of the type</param>
+        /// <returns></returns>
+        public static T GetRandom<T>(IEnumerable<T> items)
+        {
+            if (!items.Any())
+                return default;
+            else if (items.Count() == 1)
+                return items.First();
+
+            return items.ElementAt(UnityEngine.Random.Range(0, items.Count()));
         }
     }
 }

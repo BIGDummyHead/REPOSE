@@ -4,6 +4,7 @@ using System.IO;
 using UnityEngine;
 using UnityEngine.Networking;
 using HarmonyLib;
+using REPOSE.Logger;
 
 namespace REPOSE.Mods.Assets
 {
@@ -22,7 +23,7 @@ namespace REPOSE.Mods.Assets
         /// <param name="fileName"></param>
         /// <param name="fileBaseDir">Base Directory</param>
         /// <param name="customName">A Custom Name To Be Accessed Under</param>
-        public static void RegisterAudio(string fileName, string fileBaseDir, string customName = null)
+        public static void RegisterAudio(string fileName, string fileBaseDir, string? customName = null)
         {
             string audioPath = Path.Combine(fileBaseDir, fileName);
 
@@ -31,7 +32,7 @@ namespace REPOSE.Mods.Assets
 
             if (clips.ContainsKey(customName))
             {
-                Debug.Log($"{customName} Has Already Been Registered!");
+                RepoDebugger.Log($"{customName} Has Already Been Registered!");
                 return;
             }
 
@@ -48,7 +49,7 @@ namespace REPOSE.Mods.Assets
 
                 if (error)
                 {
-                    Debug.Log($"Failed To Load Your Audio! {customName}");
+                    RepoDebugger.Log($"Failed To Load Your Audio! {customName}");
                     return;
                 }
 
@@ -70,7 +71,7 @@ namespace REPOSE.Mods.Assets
                 return clips[registeredName];
             }
 
-            Debug.Log($"Make Sure To Register {registeredName} Before Use");
+            RepoDebugger.Log($"Make Sure To Register {registeredName} Before Use");
             return default;
         }
 
@@ -86,7 +87,7 @@ namespace REPOSE.Mods.Assets
                 onLoad.Invoke(GetAudio(name));
             }
             else
-                Debug.Log("Register Audio First " + name);
+                RepoDebugger.Log("Register Audio First " + name);
         }
 
         /// <summary>
@@ -119,7 +120,7 @@ namespace REPOSE.Mods.Assets
         /// <param name="fileName"></param>
         /// <param name="fileBaseDir">Base Directory</param>
         /// <param name="customName">A Custom Name To Accessed Under</param>
-        public static void RegisterBundle(string fileName, string fileBaseDir, string customName = null)
+        public static void RegisterBundle(string fileName, string fileBaseDir, string? customName = null)
         {
             string full = Path.Combine(fileBaseDir, fileName);
 
@@ -128,7 +129,7 @@ namespace REPOSE.Mods.Assets
 
             if (bundles.ContainsKey(customName))
             {
-                Debug.Log("This Bundle Is Already Registered " + customName);
+                RepoDebugger.Log("This Bundle Is Already Registered " + customName);
                 return;
             }
 
@@ -142,12 +143,12 @@ namespace REPOSE.Mods.Assets
         /// </summary>
         /// <param name="name"></param>
         /// <returns></returns>
-        public static AssetBundle GetBundle(string name)
+        public static AssetBundle? GetBundle(string name)
         {
             if (!bundles.ContainsKey(name))
             {
-                Debug.Log("Please Register " + name);
-                return default;
+                RepoDebugger.Log("Please Register " + name);
+                return null;
             }
 
             return bundles[name];
@@ -163,7 +164,7 @@ namespace REPOSE.Mods.Assets
             if (bundles.ContainsKey(name))
                 onLoad.Invoke(bundles[name]);
             else
-                Debug.Log("Please Register " + name);
+                RepoDebugger.Log("Please Register " + name);
         }
 
         /// <summary>
@@ -175,7 +176,7 @@ namespace REPOSE.Mods.Assets
         /// <returns><typeparamref name="T"/></returns>
         public static T GetBundle<T>(string name, bool instantiate = false) where T : UnityEngine.Object
         {
-            T ran = null;
+            T? ran = null;
 
             GetBundle(name, delegate (AssetBundle bundle)
             {
@@ -207,7 +208,7 @@ namespace REPOSE.Mods.Assets
         /// <param name="width">Width of the texture</param>
         /// <param name="height">Height of the texture</param>
         /// <param name="customName">Custom name to be accessed by</param>
-        public static void RegisterTexture(string fileName, string fileBaseDir, int width = 500, int height = 500, string customName = null)
+        public static void RegisterTexture(string fileName, string fileBaseDir, int width = 500, int height = 500, string? customName = null)
         {
             string full = Path.Combine(fileBaseDir, fileName);
 
@@ -219,7 +220,7 @@ namespace REPOSE.Mods.Assets
 
             if (images.ContainsKey(customName))
             {
-                Debug.Log("This File Has Already Been Registered As An Image | " + customName);
+                RepoDebugger.Log("This File Has Already Been Registered As An Image | " + customName);
                 return;
             }
 
@@ -228,10 +229,10 @@ namespace REPOSE.Mods.Assets
             if (_text.LoadImage(File.ReadAllBytes(full)))
             {
                 images.Add(customName, _text);
-                Debug.Log("Texture Registered " + customName);
+                RepoDebugger.Log("Texture Registered " + customName);
             }
             else
-                Debug.Log($"{customName} Could Not Be Registered");
+                RepoDebugger.Log($"{customName} Could Not Be Registered");
         }
 
         /// <summary>
@@ -239,14 +240,14 @@ namespace REPOSE.Mods.Assets
         /// </summary>
         /// <param name="name"></param>
         /// <returns>an Image</returns>
-        public static Texture2D GetTexture(string name)
+        public static Texture2D? GetTexture(string name)
         {
             if (images.ContainsKey(name))
                 return images[name];
             else
-                Debug.Log("Please Register " + name);
+                RepoDebugger.Log("Please Register " + name);
 
-            return default;
+            return null;
         }
 
     }

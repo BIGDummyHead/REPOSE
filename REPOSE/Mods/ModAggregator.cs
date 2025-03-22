@@ -6,10 +6,8 @@ using System.Reflection;
 using HarmonyLib;
 using Newtonsoft.Json;
 using REPOSE.Logger;
-using REPOSE.Mods.Events;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using Debug = REPOSE.Logger.Debug;
 
 namespace REPOSE.Mods
 {
@@ -51,12 +49,12 @@ namespace REPOSE.Mods
                 harmonyInstance.PatchAll(Assembly.GetExecutingAssembly());
             }
             LoadedMods ??= LoadMods();
-
-            Debug.LogInfo("Successfully loaded mods!");
-            Debug._defLogger.Dispose();
+            
+            RepoDebugger.LogInfo("Successfully loaded mods!");
+            RepoDebugger._defLogger.Dispose();
 
             //start a new console logger, allocates
-            Debug._defLogger = new ConsoleLogger();
+            RepoDebugger._defLogger = new ConsoleLogger();
 
             InitializeMods(true); //we need to do this for main menu support
 
@@ -68,7 +66,7 @@ namespace REPOSE.Mods
 
             
 
-            Debug.LogInfo("Success Loaded Mods!\r\nThank you for downloading REPOSE. https://github.com/BIGDummyHead/REPOSE");
+            RepoDebugger.LogInfo("Success Loaded Mods!\r\nThank you for downloading REPOSE. https://github.com/BIGDummyHead/REPOSE");
 
             return LoadedMods.Count;
         }
@@ -141,12 +139,12 @@ namespace REPOSE.Mods
 
         private static void DisplayMod(Mod mod)
         {
-            Debug.ChangeColor(ConsoleColor.Green);
-            Debug.Log("== Mod Loaded ==");
-            Debug.ChangeColor(ConsoleColor.White);
-            Debug.Log(mod);
-            Debug.ChangeColor(ConsoleColor.Green);
-            Debug.Log("================");
+            RepoDebugger.ChangeColor(ConsoleColor.Green);
+            RepoDebugger.Log("== Mod Loaded ==");
+            RepoDebugger.ChangeColor(ConsoleColor.White);
+            RepoDebugger.Log(mod);
+            RepoDebugger.ChangeColor(ConsoleColor.Green);
+            RepoDebugger.Log("================");
         }
 
         /// <summary>
@@ -172,33 +170,23 @@ namespace REPOSE.Mods
         {
             List<Mod> mods = new List<Mod>();
 
-            List<(string modInfoPath, Assembly modDLL)> aggreatedModItems = Aggregate();
+            List<(Info modInfo, Assembly modDLL)> aggreatedModItems = Aggregate();
 
             foreach (var modItem in aggreatedModItems)
             {
-                if (string.IsNullOrEmpty(modItem.modInfoPath) || !File.Exists(modItem.modInfoPath) ||
-                    modItem.modDLL == null)
+                if (modItem.modDLL == null)
                 {
-                    Debug.LogError($"There was an error reading a path to following mod: {modItem}");
+                    RepoDebugger.LogError($"There was an error reading a path to following mod: {modItem}");
                     continue;
                 }
-                string modInfoText = File.ReadAllText(modItem.modInfoPath);
 
                 try
                 {
-                    Info desModInfo = JsonConvert.DeserializeObject<Info>(modInfoText);
-
-                    //We want to use loadfrom, not load file.
-                    //See here: https://stackoverflow.com/questions/1477843/difference-between-loadfile-and-loadfrom-with-net-assemblies
-                    //Main reason for us is because if the mod dll relies on other DLLs, it does not import them.
-                    //So dependencies for the mod get loaded.
-                    //Assembly loadedModAssem = Assembly.LoadFrom(modItem.modDLLPath);
-
                     Type modType = modItem.modDLL.GetTypes().FirstOrDefault(type => type.IsSubclassOf(typeof(Mod)));
 
                     if (modType == null)
                     {
-                        Debug.LogError($"The chosen assembly, did not contain a type with subclass of {nameof(Mod)}");
+                        RepoDebugger.LogError($"The chosen assembly, did not contain a type with subclass of {nameof(Mod)}");
                         continue;
                     }
 
@@ -206,18 +194,18 @@ namespace REPOSE.Mods
 
                     if (ctor == null)
                     {
-                        Debug.LogError($"{modType.FullName} does not have an empty constructor. Please make an empty constructor.");
+                        RepoDebugger.LogError($"{modType.FullName} does not have an empty constructor. Please make an empty constructor.");
                         continue;
                     }
 
                     //finally a mod !yippee
                     Mod mod = (Mod)ctor.Invoke(new object[0]);
-                    mod.info = desModInfo;
+                    mod.info = modItem.modInfo;
                     mods.Add(mod);
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogError($"Could not load mod: '{modItem}'\r\n\tReason: {ex}");
+                    RepoDebugger.LogError($"Could not load mod: '{modItem}'\r\n\tReason: {ex}");
                     continue;
                 }
             }
@@ -225,16 +213,30 @@ namespace REPOSE.Mods
             return mods;
         }
 
+        private static Info? ReadModInfo(string path)
+        {
+            try
+            {
+                string text = File.ReadAllText(path);
+                return JsonConvert.DeserializeObject<Info>(text);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         /// <summary>
         /// Loads all valid directories (Mods) 
         /// </summary>
         /// <returns></returns>
-        public static List<(string modPath, Assembly loadedDLL)> Aggregate()
+        public static List<(Info modInfo, Assembly loadedDLL)> Aggregate()
         {
-            List<(string modPath, Assembly loadedDLL)> aggregation = new List<(string, Assembly)>();
+            List<(Info modInfo, Assembly loadedDLL)> aggregation = new List<(Info, Assembly)>();
 
             foreach (string dir in ModFolders)
             {
+                RepoDebugger.LogInfo($"Checking {dir} for mods");
                 if (!Directory.Exists(dir))
                     continue; //skip over, since it does not exist for some reason now.
 
@@ -242,56 +244,81 @@ namespace REPOSE.Mods
 
                 //Retrieve releavant mod files, .mod and .dlls
                 string modInfoPath = filePaths.FirstOrDefault(x => Path.GetExtension(x).Equals(".mod", StringComparison.OrdinalIgnoreCase));
+
+                Info? desModInfo = ReadModInfo(modInfoPath);
+
+                if (desModInfo == null)
+                {
+                    RepoDebugger.LogError($"When trying to deserialize '{modInfoPath}' a problem ocurred");
+                    continue;
+                }
+
                 IEnumerable<string> dllPaths = filePaths.Where(pth => Path.GetExtension(pth).Equals(".dll", StringComparison.OrdinalIgnoreCase));
 
                 //Check for any errors inside of this folder. If so, skip over, we do not wanna ruin the rest of the mods.
                 if (string.IsNullOrEmpty(modInfoPath))
                 {
-                    Debug.LogWarning($"Could not load directory '{dir}' because there was no *.mod file.");
+                    RepoDebugger.LogWarning($"Could not load directory '{dir}' because there was no *.mod file.");
                     continue;
                 }
-                else if (!dllPaths.Any())
+                else if (!dllPaths.Any() && string.IsNullOrEmpty(desModInfo.Value.DebugPath))
                 {
-                    Debug.LogWarning($"Could not load directory '{dir}' because there was no *.dll file(s) to load.");
+                    RepoDebugger.LogWarning($"Could not load directory '{dir}' because there was no *.dll file(s) to load.");
                     continue;
                 }
+
+                
+
 
                 Assembly? modAssembly = null;
-                foreach (string dllPath in dllPaths)
+
+                if (string.IsNullOrEmpty(desModInfo.Value.DebugPath) || !File.Exists(desModInfo.Value.DebugPath))
                 {
-                    if (!File.Exists(dllPath))
-                        continue;
-
-                    //get file data
-                    //byte[] dllBytes = File.ReadAllBytes(dllPath);
-
-                    //does not load the this into the currrent domain, meaning that we are just reading this file and not deps
-
-                    //We want to use loadfrom, not load file.
-                    //See here: https://stackoverflow.com/questions/1477843/difference-between-loadfile-and-loadfrom-with-net-assemblies
-                    //Main reason for us is because if the mod dll relies on other DLLs, it does not import them.
-                    //So dependencies for the mod get loaded.
-                    Assembly currentAssembly = Assembly.LoadFrom(dllPath);
-
-                    //Get any type matching
-                    Type currentAssemblyMod = currentAssembly.GetTypes().FirstOrDefault(type => type.IsSubclassOf(typeof(Mod)));
-
-                    if (currentAssemblyMod != null)
+                    RepoDebugger.LogInfo("Checking for dll files...");
+                    foreach (string dllPath in dllPaths)
                     {
-                        modAssembly = currentAssembly;
-                        break;
+                        RepoDebugger.LogInfo($"{dllPath}");
+                        if (!File.Exists(dllPath))
+                            continue;
+
+                        //get file data
+                        //byte[] dllBytes = File.ReadAllBytes(dllPath);
+
+                        //does not load the this into the currrent domain, meaning that we are just reading this file and not deps
+
+                        //We want to use loadfrom, not load file.
+                        //See here: https://stackoverflow.com/questions/1477843/difference-between-loadfile-and-loadfrom-with-net-assemblies
+                        //Main reason for us is because if the mod dll relies on other DLLs, it does not import them.
+                        //So dependencies for the mod get loaded.
+                        Assembly currentAssembly = Assembly.LoadFrom(dllPath);
+
+                        //Get any type matching
+                        Type currentAssemblyMod = currentAssembly.GetTypes().FirstOrDefault(type => type.IsSubclassOf(typeof(Mod)));
+
+                        if (currentAssemblyMod != null)
+                        {
+                            modAssembly = currentAssembly;
+                            RepoDebugger.LogInfo($"Chose assembly '{modAssembly.FullName}'");
+                            break;
+                        }
                     }
                 }
+                else
+                {
+                    modAssembly = Assembly.LoadFrom(desModInfo.Value.DebugPath);
+                    RepoDebugger.LogInfo($"Chose debug assembly '{modAssembly.FullName}'");
+                }
+
 
                 if (modAssembly == null)
                 {
-                    Debug.LogWarning($"Could not load directory '{dir}' because there was no valid .dll types with a Mod inheritance.");
+                    RepoDebugger.LogWarning($"Could not load directory '{dir}' because there was no valid .dll types with a Mod inheritance.");
                     continue;
                 }
 
                 //We have thus confirmed that there is a "valid" .mod folder and a valid Assembly path
                 //We are not sure if the Mod Info Path is valid, mainly because we did not read it, but we know it exist.
-                aggregation.Add((modInfoPath, modAssembly));
+                aggregation.Add((desModInfo.Value, modAssembly));
             }
 
             //Return the list of successful items

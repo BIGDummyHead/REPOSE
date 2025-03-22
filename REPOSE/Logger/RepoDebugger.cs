@@ -7,7 +7,7 @@ namespace REPOSE.Logger
     /// <summary>
     /// Debug class for logging and other useful information, to later be added.
     /// </summary>
-    public static class Debug
+    public static class RepoDebugger
     {
         /// <summary>
         /// Default logger used.
