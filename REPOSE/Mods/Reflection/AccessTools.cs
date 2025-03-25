@@ -44,7 +44,7 @@ namespace REPOSE.Mods.Reflection
             if(type == null)
                 return;
 
-            FieldInfo field = type.GetField(fieldName);
+            FieldInfo field = type.GetField(fieldName, ALL);
 
             if (field == null)
                 return;

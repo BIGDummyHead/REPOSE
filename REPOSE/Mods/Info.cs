@@ -42,6 +42,8 @@ namespace REPOSE.Mods
         [JsonProperty("debug_path")]
         public string DebugPath { get; set; }
 
+        public readonly bool IsDebug => !string.IsNullOrEmpty(DebugPath);
+
         public override string ToString()
         {
             string top = $"{Name} created by {Author}\r\n{Description}\r\nVersion: {Version}";

@@ -3,11 +3,14 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using HarmonyLib;
 using Newtonsoft.Json;
-using REPOSE.Logger;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using static UnityEngine.Scripting.GarbageCollector;
 
 namespace REPOSE.Mods
 {
@@ -16,6 +19,11 @@ namespace REPOSE.Mods
     /// </summary>
     public static class ModAggregator
     {
+        /// <summary>
+        /// Controller for the console, allows you to show, hide, open, and free. Automatically set when mods are loaded.
+        /// </summary>
+        public static ConsoleController? ConsoleController {  get; private set; }
+
         const string HARMONY_ID = "com.REPOSE.Mods.dll";
         static readonly Harmony harmonyInstance = new Harmony(HARMONY_ID);
 
@@ -31,15 +39,18 @@ namespace REPOSE.Mods
         /// </summary>
         public static string[] ModFolders => Directory.GetDirectories(ModsFolderPath);
 
+        public static IReadOnlyList<AggregatedMod>? LoadedMods => _loadedMods;
 
 
-        public static IReadOnlyList<Mod>? LoadedMods { get; private set; }
+
+        private static List<AggregatedMod>? _loadedMods;
 
         private static bool modsLoaded = false;
         private static int LoadAndStartMods()
         {
             if (modsLoaded)
                 return 0;
+
 
             modsLoaded = true;
             if (!Harmony.HasAnyPatches(HARMONY_ID))
@@ -48,28 +59,87 @@ namespace REPOSE.Mods
                 //initialize patching methods for harmony.
                 harmonyInstance.PatchAll(Assembly.GetExecutingAssembly());
             }
-            LoadedMods ??= LoadMods();
+
+            _loadedMods ??= CreateModInstances();
             
-            RepoDebugger.LogInfo("Successfully loaded mods!");
-            RepoDebugger._defLogger.Dispose();
+            Debug.Log("Successfully loaded mods!");
 
+            //Debug._defLogger.Dispose();
+
+            ConsoleController = new ConsoleController();
+            ConsoleController.ALlocate();
             //start a new console logger, allocates
-            RepoDebugger._defLogger = new ConsoleLogger();
+            //Debug._defLogger = new ConsoleLogger();
+            foreach (AggregatedMod mod in _loadedMods)
+            {
+                DisplayMod(mod.mod);
+            }
 
-            InitializeMods(true); //we need to do this for main menu support
+            InitializeMods(); //we need to do this for main menu support
 
-            SceneManager.sceneLoaded += (Scene scene, LoadSceneMode mode) =>
+            /*SceneManager.sceneLoaded += (Scene scene, LoadSceneMode mode) =>
             {
                 UninitializeMods();
                 InitializeMods();
-            };
+            };*/
 
-            
+            Debug.Log("Success Loaded Mods!\r\nThank you for downloading REPOSE. https://github.com/BIGDummyHead/REPOSE");
 
-            RepoDebugger.LogInfo("Success Loaded Mods!\r\nThank you for downloading REPOSE. https://github.com/BIGDummyHead/REPOSE");
 
             return LoadedMods.Count;
         }
+
+
+
+        
+
+
+        /// <summary>
+        /// Initializes all mods that are in the LoadedMods
+        /// </summary>
+        /// <param name="displayInfo"></param>
+        /// <returns></returns>
+        public static bool InitializeMods()
+        {
+            if (LoadedMods == null)
+                return false;
+
+            foreach (AggregatedMod aggMod in LoadedMods)
+            {
+                aggMod.mod.Initialize();
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Uninitialize all loaded mods, is false if mods have not been loaded...
+        /// </summary>
+        public static bool UninitializeMods()
+        {
+            if (LoadedMods == null)
+                return false;
+
+            foreach (AggregatedMod aggMod in LoadedMods)
+            {
+                aggMod.mod.UnInitialize();
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// If mods are loaded then calls the the Uninitialize and the Initialize methods to restart the mods.
+        /// </summary>
+        public static void ReloadMods()
+        {
+            if(!modsLoaded) return;
+
+            UninitializeMods();
+            InitializeMods();
+        }
+
+
 
         internal static Dictionary<Type, List<MonoBehaviour>> typeInstances = new Dictionary<Type, List<MonoBehaviour>>();
         private static void TypeInstanceMonitor()
@@ -118,100 +188,109 @@ namespace REPOSE.Mods
                 typeInstances[type].Remove(__instance);
         }
 
-        // <summary>
-        /// Initialize all loaded mods, is false if mods have not been loaded...
-        /// </summary>
-        public static bool InitializeMods(bool displayInfo = false)
+        
+
+       
+        public static List<AggregatedMod> CreateModInstances()
         {
-            if (LoadedMods == null)
-                return false;
-
-            foreach (Mod mod in LoadedMods)
+            List<AggregatedMod> mods = new List<AggregatedMod>();
+            foreach (string modFolder in ModFolders)
             {
-                if(displayInfo)
-                    DisplayMod(mod);
+                AggregatedMod aggMod = new AggregatedMod();
 
-                mod.Initialize();
+                string[] files = Directory.GetFiles(modFolder);
+
+                string modInfoFile = files.FirstOrDefault(f => Path.GetExtension(f).Equals(MOD_JSON_IDENTIFIER));
+
+                if(string.IsNullOrEmpty(modInfoFile))
+                {
+                    Debug.LogError($"{modFolder} does not a {MOD_JSON_IDENTIFIER} file.");
+                    continue;
+                }
+
+                Info? posInfo = ReadModInfo(modInfoFile);
+                if (posInfo == null)
+                {
+                    Debug.LogError($"{modFolder} had an invalid Mod info file.");
+                    continue;
+                }
+                aggMod.info = posInfo.Value;
+
+                if (aggMod.info.IsDebug) //simply load the debug path file...
+                {
+                    aggMod.dllPath = aggMod.info.DebugPath;
+                    aggMod.assembly = Assembly.LoadFrom(aggMod.dllPath);
+                    aggMod.loadedAssemblies = new List<Assembly>(new Assembly[1]{ aggMod.assembly });
+
+                    if(!CreateModInstance(aggMod.assembly, aggMod))
+                    {
+                        Debug.LogWarning($"{aggMod.info.DebugPath} was not a valid mod dll.");
+                        continue;
+                    }
+                    else
+                    {
+                        Debug.Log($"Loaded mod from debug path, {aggMod.mod}");
+                    }
+                }
+                else //is not a debug path 
+                {
+                    IEnumerable<string> dllFiles = files.Where(f => Path.GetExtension(f).Equals(".dll"));
+                    if (!dllFiles.Any())
+                    {
+                        Debug.LogError($"{modFolder} does not have any .dll files.");
+                        continue;
+                    }
+
+                    aggMod.loadedAssemblies = new List<Assembly>();
+                    Assembly? modAssembly = null;
+                    foreach (string assemFile in dllFiles)
+                    {
+                        Assembly current = Assembly.LoadFrom(assemFile);
+
+                        if (modAssembly == null && CreateModInstance(current, aggMod))
+                        {
+                            modAssembly = current;
+                        }
+
+                        aggMod.loadedAssemblies.Add(current);
+                    }
+                }
+
+                Debug.Log($"Loaded mod: {aggMod.mod}");
+                mods.Add(aggMod);
+                DisplayMod(aggMod.mod);
             }
+
+            return mods;
+        }
+
+        private static bool CreateModInstance(Assembly current, AggregatedMod aggMod)
+        {
+            Type? modType = current.GetTypes().FirstOrDefault(type =>
+            type.IsSubclassOf(typeof(Mod))
+            && type.GetConstructor(new Type[0]) != null);
+
+            if (modType == null)
+                return false;
+            //modAssembly = current;
+            aggMod.dllPath = current.CodeBase;
+            aggMod.mod = (Mod)Activator.CreateInstance(modType);
+            aggMod.mod.assembly = current;
+            aggMod.mod.info = aggMod.info;
+
 
             return true;
         }
 
         private static void DisplayMod(Mod mod)
         {
-            RepoDebugger.ChangeColor(ConsoleColor.Green);
-            RepoDebugger.Log("== Mod Loaded ==");
-            RepoDebugger.ChangeColor(ConsoleColor.White);
-            RepoDebugger.Log(mod);
-            RepoDebugger.ChangeColor(ConsoleColor.Green);
-            RepoDebugger.Log("================");
+            Debug.Log("== Mod Loaded ==");
+            Debug.Log(mod);
+            Debug.Log("================");
         }
 
-        /// <summary>
-        /// Uninitialize all loaded mods, is false if mods have not been loaded...
-        /// </summary>
-        public static bool UninitializeMods()
-        {
-            if (LoadedMods == null)
-                return false;
 
-            foreach (Mod mod in LoadedMods)
-            {
-                mod.UnInitialize();
-            }
 
-            return true;
-        }
-
-        /// <summary>
-        /// This action cannot be undone, Aggregates all mods, loads their dll and info. DOES NOT INTIALIZE
-        /// </summary>
-        public static List<Mod> LoadMods()
-        {
-            List<Mod> mods = new List<Mod>();
-
-            List<(Info modInfo, Assembly modDLL)> aggreatedModItems = Aggregate();
-
-            foreach (var modItem in aggreatedModItems)
-            {
-                if (modItem.modDLL == null)
-                {
-                    RepoDebugger.LogError($"There was an error reading a path to following mod: {modItem}");
-                    continue;
-                }
-
-                try
-                {
-                    Type modType = modItem.modDLL.GetTypes().FirstOrDefault(type => type.IsSubclassOf(typeof(Mod)));
-
-                    if (modType == null)
-                    {
-                        RepoDebugger.LogError($"The chosen assembly, did not contain a type with subclass of {nameof(Mod)}");
-                        continue;
-                    }
-
-                    ConstructorInfo ctor = modType.GetConstructor(new Type[0]);
-
-                    if (ctor == null)
-                    {
-                        RepoDebugger.LogError($"{modType.FullName} does not have an empty constructor. Please make an empty constructor.");
-                        continue;
-                    }
-
-                    //finally a mod !yippee
-                    Mod mod = (Mod)ctor.Invoke(new object[0]);
-                    mod.info = modItem.modInfo;
-                    mods.Add(mod);
-                }
-                catch (Exception ex)
-                {
-                    RepoDebugger.LogError($"Could not load mod: '{modItem}'\r\n\tReason: {ex}");
-                    continue;
-                }
-            }
-
-            return mods;
-        }
 
         private static Info? ReadModInfo(string path)
         {
@@ -226,105 +305,16 @@ namespace REPOSE.Mods
             }
         }
 
-        /// <summary>
-        /// Loads all valid directories (Mods) 
-        /// </summary>
-        /// <returns></returns>
-        public static List<(Info modInfo, Assembly loadedDLL)> Aggregate()
+
+
+        public class AggregatedMod
         {
-            List<(Info modInfo, Assembly loadedDLL)> aggregation = new List<(Info, Assembly)>();
-
-            foreach (string dir in ModFolders)
-            {
-                RepoDebugger.LogInfo($"Checking {dir} for mods");
-                if (!Directory.Exists(dir))
-                    continue; //skip over, since it does not exist for some reason now.
-
-                string[] filePaths = Directory.GetFiles(dir);
-
-                //Retrieve releavant mod files, .mod and .dlls
-                string modInfoPath = filePaths.FirstOrDefault(x => Path.GetExtension(x).Equals(".mod", StringComparison.OrdinalIgnoreCase));
-
-                Info? desModInfo = ReadModInfo(modInfoPath);
-
-                if (desModInfo == null)
-                {
-                    RepoDebugger.LogError($"When trying to deserialize '{modInfoPath}' a problem ocurred");
-                    continue;
-                }
-
-                IEnumerable<string> dllPaths = filePaths.Where(pth => Path.GetExtension(pth).Equals(".dll", StringComparison.OrdinalIgnoreCase));
-
-                //Check for any errors inside of this folder. If so, skip over, we do not wanna ruin the rest of the mods.
-                if (string.IsNullOrEmpty(modInfoPath))
-                {
-                    RepoDebugger.LogWarning($"Could not load directory '{dir}' because there was no *.mod file.");
-                    continue;
-                }
-                else if (!dllPaths.Any() && string.IsNullOrEmpty(desModInfo.Value.DebugPath))
-                {
-                    RepoDebugger.LogWarning($"Could not load directory '{dir}' because there was no *.dll file(s) to load.");
-                    continue;
-                }
-
-                
-
-
-                Assembly? modAssembly = null;
-
-                if (string.IsNullOrEmpty(desModInfo.Value.DebugPath) || !File.Exists(desModInfo.Value.DebugPath))
-                {
-                    RepoDebugger.LogInfo("Checking for dll files...");
-                    foreach (string dllPath in dllPaths)
-                    {
-                        RepoDebugger.LogInfo($"{dllPath}");
-                        if (!File.Exists(dllPath))
-                            continue;
-
-                        //get file data
-                        //byte[] dllBytes = File.ReadAllBytes(dllPath);
-
-                        //does not load the this into the currrent domain, meaning that we are just reading this file and not deps
-
-                        //We want to use loadfrom, not load file.
-                        //See here: https://stackoverflow.com/questions/1477843/difference-between-loadfile-and-loadfrom-with-net-assemblies
-                        //Main reason for us is because if the mod dll relies on other DLLs, it does not import them.
-                        //So dependencies for the mod get loaded.
-                        Assembly currentAssembly = Assembly.LoadFrom(dllPath);
-
-                        //Get any type matching
-                        Type currentAssemblyMod = currentAssembly.GetTypes().FirstOrDefault(type => type.IsSubclassOf(typeof(Mod)));
-
-                        if (currentAssemblyMod != null)
-                        {
-                            modAssembly = currentAssembly;
-                            RepoDebugger.LogInfo($"Chose assembly '{modAssembly.FullName}'");
-                            break;
-                        }
-                    }
-                }
-                else
-                {
-                    modAssembly = Assembly.LoadFrom(desModInfo.Value.DebugPath);
-                    RepoDebugger.LogInfo($"Chose debug assembly '{modAssembly.FullName}'");
-                }
-
-
-                if (modAssembly == null)
-                {
-                    RepoDebugger.LogWarning($"Could not load directory '{dir}' because there was no valid .dll types with a Mod inheritance.");
-                    continue;
-                }
-
-                //We have thus confirmed that there is a "valid" .mod folder and a valid Assembly path
-                //We are not sure if the Mod Info Path is valid, mainly because we did not read it, but we know it exist.
-                aggregation.Add((desModInfo.Value, modAssembly));
-            }
-
-            //Return the list of successful items
-            return aggregation;
+            public Mod mod;
+            public Info info;
+            public Assembly assembly;
+            public string dllPath;
+            public List<Assembly> loadedAssemblies;
+            //other info that is neccessary 
         }
-
-
     }
 }

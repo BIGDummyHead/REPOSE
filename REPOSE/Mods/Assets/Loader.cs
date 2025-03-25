@@ -4,7 +4,6 @@ using System.IO;
 using UnityEngine;
 using UnityEngine.Networking;
 using HarmonyLib;
-using REPOSE.Logger;
 
 namespace REPOSE.Mods.Assets
 {
@@ -27,12 +26,11 @@ namespace REPOSE.Mods.Assets
         {
             string audioPath = Path.Combine(fileBaseDir, fileName);
 
-            if (customName is null)
-                customName = Path.GetFileNameWithoutExtension(audioPath);
+            customName ??= Path.GetFileNameWithoutExtension(audioPath);
 
             if (clips.ContainsKey(customName))
             {
-                RepoDebugger.Log($"{customName} Has Already Been Registered!");
+                Debug.Log($"{customName} Has Already Been Registered!");
                 return;
             }
 
@@ -49,7 +47,7 @@ namespace REPOSE.Mods.Assets
 
                 if (error)
                 {
-                    RepoDebugger.Log($"Failed To Load Your Audio! {customName}");
+                    Debug.Log($"Failed To Load Your Audio! {customName}");
                     return;
                 }
 
@@ -71,7 +69,7 @@ namespace REPOSE.Mods.Assets
                 return clips[registeredName];
             }
 
-            RepoDebugger.Log($"Make Sure To Register {registeredName} Before Use");
+            Debug.Log($"Make Sure To Register {registeredName} Before Use");
             return default;
         }
 
@@ -87,7 +85,7 @@ namespace REPOSE.Mods.Assets
                 onLoad.Invoke(GetAudio(name));
             }
             else
-                RepoDebugger.Log("Register Audio First " + name);
+                Debug.Log("Register Audio First " + name);
         }
 
         /// <summary>
@@ -129,7 +127,7 @@ namespace REPOSE.Mods.Assets
 
             if (bundles.ContainsKey(customName))
             {
-                RepoDebugger.Log("This Bundle Is Already Registered " + customName);
+                Debug.Log("This Bundle Is Already Registered " + customName);
                 return;
             }
 
@@ -147,7 +145,7 @@ namespace REPOSE.Mods.Assets
         {
             if (!bundles.ContainsKey(name))
             {
-                RepoDebugger.Log("Please Register " + name);
+                Debug.Log("Please Register " + name);
                 return null;
             }
 
@@ -164,7 +162,7 @@ namespace REPOSE.Mods.Assets
             if (bundles.ContainsKey(name))
                 onLoad.Invoke(bundles[name]);
             else
-                RepoDebugger.Log("Please Register " + name);
+                Debug.Log("Please Register " + name);
         }
 
         /// <summary>
@@ -220,7 +218,7 @@ namespace REPOSE.Mods.Assets
 
             if (images.ContainsKey(customName))
             {
-                RepoDebugger.Log("This File Has Already Been Registered As An Image | " + customName);
+                Debug.Log("This File Has Already Been Registered As An Image | " + customName);
                 return;
             }
 
@@ -229,10 +227,10 @@ namespace REPOSE.Mods.Assets
             if (_text.LoadImage(File.ReadAllBytes(full)))
             {
                 images.Add(customName, _text);
-                RepoDebugger.Log("Texture Registered " + customName);
+                Debug.Log("Texture Registered " + customName);
             }
             else
-                RepoDebugger.Log($"{customName} Could Not Be Registered");
+                Debug.Log($"{customName} Could Not Be Registered");
         }
 
         /// <summary>
@@ -245,7 +243,7 @@ namespace REPOSE.Mods.Assets
             if (images.ContainsKey(name))
                 return images[name];
             else
-                RepoDebugger.Log("Please Register " + name);
+                Debug.Log("Please Register " + name);
 
             return null;
         }

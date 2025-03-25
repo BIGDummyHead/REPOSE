@@ -8,6 +8,8 @@ namespace REPOSE.Mods.Events
     [HarmonyPatch]
     public static class GameEvents
     {
+
+
         public static event Delegates.OnChangeLevel? BeforeLevelChanged;
         public static event Delegates.OnChangeLevel? AfterLevelChanged;
 

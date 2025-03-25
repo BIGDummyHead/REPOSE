@@ -42,7 +42,7 @@ namespace REPOSE.Mods
         {
             if(typeof(T).GetMethod(methodName, ALL)?.GetCustomAttribute<PunRPC>() == null)
             {
-                Logger.RepoDebugger.LogWarning($"Failed to get the appropriate method for running RPC: {methodName} on type {typeof(T).FullName}");
+                Debug.LogWarning($"Failed to get the appropriate method for running RPC: {methodName} on type {typeof(T).FullName}");
                 return;
             }
 
@@ -53,7 +53,7 @@ namespace REPOSE.Mods
 
                 if (reflectedPView == null)
                 {
-                    Logger.RepoDebugger.LogWarning($"Failed to get a photonView for type: {typeof(T).FullName}, please provide one.");
+                    Debug.LogWarning($"Failed to get a photonView for type: {typeof(T).FullName}, please provide one.");
                     return;
                 }
 
@@ -95,7 +95,7 @@ namespace REPOSE.Mods
         /// <typeparam name="T">Items from a collection type</typeparam>
         /// <param name="items">All items of the type</param>
         /// <returns></returns>
-        public static T GetRandom<T>(IEnumerable<T> items)
+        public static T GetRandom<T>(this IEnumerable<T> items)
         {
             if (!items.Any())
                 return default;
